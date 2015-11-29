@@ -21,6 +21,8 @@ public class LazyConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		
 		public DictionaryEntry() {
 			key = null;
+			value = null;
+			next = null;
 			lock = new ReentrantLock();
 			mark = false;
 		}
@@ -199,6 +201,7 @@ public class LazyConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		return size;
 	}
 	
+	@Override
 	public String toString() {
 		String dicToString = "";
 		DictionaryEntry<K,V> temp = head.getNext();

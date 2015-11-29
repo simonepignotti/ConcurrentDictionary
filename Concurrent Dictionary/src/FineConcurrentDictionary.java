@@ -19,6 +19,8 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		
 		public DictionaryEntry() {
 			key = null;
+			value = null;
+			next = null;
 			lock = new ReentrantLock();
 		}
 		
@@ -71,6 +73,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		sl.setNext(sr);
 	}
 	
+	@SuppressWarnings("finally")
 	@Override
 	public V put(K key, V value) {
 		V putValue = null;
@@ -101,6 +104,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		}
 	}
 
+	@SuppressWarnings("finally")
 	@Override
 	public Boolean remove(K key, V value) {
 		Boolean removed = false;
@@ -130,6 +134,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		}
 	}
 
+	@SuppressWarnings("finally")
 	@Override
 	public Boolean replace(K key, V value) {
 		Boolean replaced = false;
@@ -158,6 +163,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		}
 	}
 
+	@SuppressWarnings("finally")
 	@Override
 	public Boolean replace(K key, V oldValue, V newValue) {
 		Boolean replaced = false;
@@ -186,6 +192,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		}
 	}
 
+	@SuppressWarnings("finally")
 	@Override
 	public V get(K key) {
 		V value = null;
@@ -217,6 +224,8 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		return size;
 	}
 	
+	@SuppressWarnings("finally")
+	@Override
 	public String toString() {
 		String dicToString = "";
 		DictionaryEntry<K,V> pre = null;
