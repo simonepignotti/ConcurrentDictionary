@@ -1,8 +1,10 @@
 
-public class FineTest {
+public class Test {
 
 	public static void main(String[] args) {
-		MyDictionary<String,Integer> myDictionary = new FineConcurrentDictionary<String,Integer>();
+		//MyDictionary<String,Integer> myDictionary = new FineConcurrentDictionary<String,Integer>();
+		//MyDictionary<String,Integer> myDictionary = new LazyConcurrentDictionary<String,Integer>();
+		MyDictionary<String,Integer> myDictionary = new LockFreeConcurrentDictionary<String,Integer>();
 		System.out.println("PUT");
 		myDictionary.put("a", 1);
 		myDictionary.put("c", 3);
@@ -17,7 +19,7 @@ public class FineTest {
 		System.out.println(myDictionary.get("d"));
 		System.out.println("SIZE: " + myDictionary.size());
 		System.out.println("REMOVE");
-		myDictionary.remove("b", 2);
+		System.out.println(myDictionary.remove("b", 2));
 		System.out.println(myDictionary.remove("c", 30));
 		System.out.println(myDictionary.toString());
 		System.out.println("SIZE: " + myDictionary.size());

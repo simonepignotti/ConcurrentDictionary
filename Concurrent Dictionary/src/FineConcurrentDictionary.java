@@ -121,7 +121,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 				pre = cur;
 				cur = cur.getNext();
 			}
-			if (key.equals(cur.getKey()) && value.equals(cur.getValue())) {
+			if (!cur.isSentinel() && key.equals(cur.getKey()) && value.equals(cur.getValue())) {
 				pre.setNext(cur.getNext());
 				size--;
 				removed = true;
@@ -209,7 +209,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 				pre = cur;
 				cur = cur.getNext();
 			}
-			if (key.equals(cur.getKey()))
+			if (!cur.isSentinel() && key.equals(cur.getKey()))
 				value = cur.getValue();
 		}
 		finally{

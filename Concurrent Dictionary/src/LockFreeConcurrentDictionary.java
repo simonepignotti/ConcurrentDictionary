@@ -6,17 +6,17 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V> implements 
 		
 		private final K key;
 		private volatile V value;
-				
-		public DictionaryEntry(K key, V value, AtomicMarkableReference<DictionaryEntry<K,V>> next) {
+		
+		public DictionaryEntry(K key, V value, DictionaryEntry<K,V> next) {
+			super(next, false);
 			this.key = key;
 			this.value = value;
-			this.next = next;
 		}
 		
 		public DictionaryEntry() {
+			super(null, false);
 			key = null;
 			value = null;
-			next = null;
 		}
 		
 		public K getKey() {
@@ -27,16 +27,8 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V> implements 
 			return value;
 		}
 		
-		public AtomicMarkableReference<DictionaryEntry<K,V>> getNext() {
-			return next;
-		}
-		
 		public void setValue(V value) {
 			this.value = value;
-		}
-		
-		public void setNext(AtomicMarkableReference<DictionaryEntry<K,V>> next) {
-			this.next = next;
 		}
 		
 		public Boolean isSentinel() {
@@ -50,66 +42,50 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V> implements 
 	}
 	
 	private volatile int size;
-	private AtomicMarkableReference<DictionaryEntry<K,V>> head;
+	private DictionaryEntry<K,V> head;
 	
 	public LockFreeConcurrentDictionary() {
 		size = 0;
-		AtomicMarkableReference<DictionaryEntry<K,V>> sl =
-				new AtomicMarkableReference<DictionaryEntry<K,V>>(new DictionaryEntry<K,V>(),false);
-		AtomicMarkableReference<DictionaryEntry<K,V>> sr =
-				new AtomicMarkableReference<DictionaryEntry<K,V>>(new DictionaryEntry<K,V>(),false);
+		DictionaryEntry<K,V> sl = new DictionaryEntry<K,V>();
+		DictionaryEntry<K,V> sr = new DictionaryEntry<K,V>();
 		head = sl;
-		sl.getReference().setNext(sr);
+		sl.set(sr, false);
 	}
 
 	@Override
 	public V put(K key, V value) {
 		V putValue = null;
-		Boolean valid = false;
+		Boolean finished = false;
 		boolean[] mark = new boolean[1];
-		while (!valid) {
-			AtomicMarkableReference<DictionaryEntry<K,V>> pre = head;
-			AtomicMarkableReference<DictionaryEntry<K,V>> cur = head.getReference().getNext();
-			DictionaryEntry<K,V> preRef = pre.getReference();
-			DictionaryEntry<K,V> curRef = cur.get(mark);
-			while (!curRef.isSentinel() && key.compareTo(curRef.getKey()) > 0) {
+		while (!finished) {
+			DictionaryEntry<K,V> pre = head;
+			DictionaryEntry<K,V> cur = head.getReference();
+			DictionaryEntry<K,V> suc;
+			while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
+				suc = cur.get(mark);
 				if (mark[0]) {
-					if (cur.compareAndSet(curRef, curRef.getNext().getReference(), false, false)) {
-						// ???
+					if (pre.compareAndSet(cur, suc, false, false)) {
+						cur = suc;
 					}
 					else {
 						pre = head;
-						cur = head.getReference().getNext();
-						preRef = pre.getReference();
-						curRef = cur.get(mark);
+						cur = head.getReference();
 					}
 				}
 				else {
 				pre = cur;
-				cur = curRef.getNext();
-				preRef = curRef;
-				curRef = cur.get(mark);
+				cur = suc;
 				}
 			}
-			if (curRef.isSentinel() || !key.equals(curRef.getKey())) {
-				try {
-					pre.lock();
-					cur.lock();
-					valid = !pre.isMarked() && (cur == pre.getNext());
-					if (valid) {
-						DictionaryEntry<K,V> newEntry = new DictionaryEntry<K,V>(key,value,cur);
-						pre.setNext(newEntry);
-						putValue = value;
-						size++;
-					}
-				}
-				finally {
-					pre.unlock();
-					cur.unlock();
+			if (cur.isSentinel() || !key.equals(cur.getKey())) {
+				finished = pre.compareAndSet(cur, new DictionaryEntry<K,V>(key, value, cur), false, false);
+				if (finished) {
+					putValue = value;
+					size++;
 				}
 			}
 			else {
-				valid = true;
+				finished = true;
 			}
 		}
 		return putValue;
@@ -117,32 +93,102 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V> implements 
 
 	@Override
 	public Boolean remove(K key, V value) {
-		// TODO Auto-generated method stub
-		return null;
+		Boolean finished = false;
+		Boolean removed = false;
+		boolean[] mark = new boolean[1];
+		while (!finished) {
+			DictionaryEntry<K,V> pre = head;
+			DictionaryEntry<K,V> cur = head.getReference();
+			DictionaryEntry<K,V> suc;
+			while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
+				suc = cur.get(mark);
+				if (mark[0]) {
+					if (pre.compareAndSet(cur, suc, false, false)) {
+						cur = suc;
+					}
+					else {
+						pre = head;
+						cur = head.getReference();
+					}
+				}
+				else {
+				pre = cur;
+				cur = suc;
+				}
+			}
+			if (!cur.isSentinel() && key.equals(cur.getKey()) && value.equals(cur.getValue())) {
+				suc = cur.getReference();
+				if (cur.attemptMark(suc, true)) {
+					finished = true;
+					removed = true;
+					size--;
+				}
+			}
+			else {
+				finished = true;
+			}
+		}
+		return removed;
 	}
 
 	@Override
 	public Boolean replace(K key, V value) {
-		// TODO Auto-generated method stub
-		return null;
+		DictionaryEntry<K,V> temp = head.getReference();
+		
+		while (!temp.isSentinel() && key.compareTo(temp.getKey()) > 0)
+			temp = temp.getReference();
+
+		if (!temp.isSentinel() && key.equals(temp.getKey()) && !temp.isMarked()) {
+			temp.setValue(value);
+			return true;
+		}
+		else return false;
 	}
 
 	@Override
 	public Boolean replace(K key, V oldValue, V newValue) {
-		// TODO Auto-generated method stub
-		return null;
+		DictionaryEntry<K,V> temp = head.getReference();
+		
+		while (!temp.isSentinel() && key.compareTo(temp.getKey()) > 0)
+			temp = temp.getReference();
+
+		if (!temp.isSentinel() && key.equals(temp.getKey()) && oldValue.equals(temp.getValue()) && !temp.isMarked()) {
+			temp.setValue(newValue);
+			return true;
+		}
+		else return false;
 	}
 
 	@Override
 	public V get(K key) {
-		// TODO Auto-generated method stub
-		return null;
+		DictionaryEntry<K,V> temp = head.getReference();
+		
+		while (!temp.isSentinel() && key.compareTo(temp.getKey()) > 0)
+			temp = temp.getReference();
+
+		if (!temp.isSentinel() && key.equals(temp.getKey()) && !temp.isMarked())
+			return temp.getValue();
+		else return null;
 	}
 
 	@Override
 	public int size() {
-		// TODO Auto-generated method stub
-		return 0;
+		return size;
+	}
+	
+	@Override
+	public String toString() {
+		String dicToString = "";
+		boolean[] mark = new boolean[1];
+		DictionaryEntry<K,V> cur = head.getReference();
+		DictionaryEntry<K,V> suc = cur.get(mark);
+		while (!cur.isSentinel()) {
+			if (!mark[0])
+				dicToString += cur.toString() + "\n";
+			cur = suc;
+			suc = suc.get(mark);
+		}
+		return dicToString;
 	}
 
 }

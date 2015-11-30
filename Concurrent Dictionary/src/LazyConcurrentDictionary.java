@@ -130,7 +130,7 @@ public class LazyConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 				pre = cur;
 				cur = cur.getNext();
 			}
-			if (key.equals(cur.getKey()) && value.equals(cur.getValue())) {
+			if (!cur.isSentinel() && key.equals(cur.getKey()) && value.equals(cur.getValue())) {
 				try {
 					pre.lock();
 					cur.lock();
@@ -191,7 +191,7 @@ public class LazyConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		while (!temp.isSentinel() && key.compareTo(temp.getKey()) > 0)
 			temp = temp.getNext();
 		
-		if (key.equals(temp.getKey()) && !temp.isMarked())
+		if (!temp.isSentinel() && key.equals(temp.getKey()) && !temp.isMarked())
 			return temp.getValue();
 		else return null;
 	}
