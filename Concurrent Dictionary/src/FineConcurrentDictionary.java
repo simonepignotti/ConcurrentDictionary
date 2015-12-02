@@ -75,38 +75,24 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 	
 	@SuppressWarnings("finally")
 	@Override
-	public V put(K key, V value) {
-		V putValue = null;
-		DictionaryEntry<K,V> pre = null;
-		DictionaryEntry<K,V> cur = null;
-		try{
-			head.lock();
-			head.getNext().lock();
-			pre = head;
-			cur = head.getNext();
-			while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
-				pre.unlock();
-				cur.getNext().lock();
-				pre = cur;
-				cur = cur.getNext();
-			}
-			if (cur.isSentinel() || !key.equals(cur.getKey())) {
-				DictionaryEntry<K,V> newEntry = new DictionaryEntry<K,V>(key,value,cur);
-				pre.setNext(newEntry);
-				putValue = value;
-				size++;
-			}
+	public boolean put(K key, V value) {
+		boolean success = false;
+		DictionaryEntry<K,V> pre = search(key);
+		DictionaryEntry<K,V> cur = pre.getNext();
+		if (cur.isSentinel() || !key.equals(cur.getKey())) {
+			DictionaryEntry<K,V> newEntry = new DictionaryEntry<K,V>(key,value,cur);
+			pre.setNext(newEntry);
+			success = true;
+			size++;
 		}
-		finally{
-			pre.unlock();
-			cur.unlock();
-			return putValue;
-		}
+		pre.unlock();
+		cur.unlock();
+		return success;
 	}
 
 	@SuppressWarnings("finally")
 	@Override
-	public Boolean remove(K key, V value) {
+	public boolean remove(K key, V value) {
 		Boolean removed = false;
 		DictionaryEntry<K,V> pre = null;
 		DictionaryEntry<K,V> cur = null;
@@ -136,7 +122,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 
 	@SuppressWarnings("finally")
 	@Override
-	public Boolean replace(K key, V value) {
+	public boolean replace(K key, V value) {
 		Boolean replaced = false;
 		DictionaryEntry<K,V> pre = null;
 		DictionaryEntry<K,V> cur = null;
@@ -165,7 +151,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 
 	@SuppressWarnings("finally")
 	@Override
-	public Boolean replace(K key, V oldValue, V newValue) {
+	public boolean replace(K key, V oldValue, V newValue) {
 		Boolean replaced = false;
 		DictionaryEntry<K,V> pre = null;
 		DictionaryEntry<K,V> cur = null;
@@ -248,6 +234,20 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 			cur.unlock();
 			return dicToString;
 		}
+	}
+	
+	private DictionaryEntry<K,V> search(K key) {
+		head.lock();
+		head.getNext().lock();
+		DictionaryEntry<K,V> pre = head;
+		DictionaryEntry<K,V> cur = head.getNext();
+		while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
+			pre.unlock();
+			pre = cur;
+			cur = cur.getNext();
+			cur.lock();
+		}
+		return pre;
 	}
 	
 }
