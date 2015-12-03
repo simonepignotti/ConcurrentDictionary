@@ -52,12 +52,12 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 			lock.unlock();
 		}
 		
-		public Boolean isSentinel() {
+		public boolean isSentinel() {
 			return (key == null);
 		}
 		
 		public String toString() {
-			return key.toString() + " : " + value.toString();
+			return key.toString() + ":" + value.toString();
 		}
 		
 	}
@@ -73,9 +73,12 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		sl.setNext(sr);
 	}
 	
-	@SuppressWarnings("finally")
 	@Override
-	public boolean put(K key, V value) {
+	public boolean put(K key, V value) throws NullKeyException, NullValueException {
+		if (key == null)
+			throw new NullKeyException("Cannot insert null key entries into the dictionary");
+		if (value == null)
+			throw new NullValueException("Cannot insert null value entries into the dictionary");
 		boolean success = false;
 		DictionaryEntry<K,V> pre = search(key);
 		DictionaryEntry<K,V> cur = pre.getNext();
@@ -90,119 +93,63 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		return success;
 	}
 
-	@SuppressWarnings("finally")
 	@Override
 	public boolean remove(K key, V value) {
-		Boolean removed = false;
-		DictionaryEntry<K,V> pre = null;
-		DictionaryEntry<K,V> cur = null;
-		try{
-			head.lock();
-			head.getNext().lock();
-			pre = head;
-			cur = head.getNext();
-			while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
-				pre.unlock();
-				cur.getNext().lock();
-				pre = cur;
-				cur = cur.getNext();
-			}
-			if (!cur.isSentinel() && key.equals(cur.getKey()) && value.equals(cur.getValue())) {
-				pre.setNext(cur.getNext());
-				size--;
-				removed = true;
-			}
+		boolean removed = false;
+		DictionaryEntry<K,V> pre = search(key);
+		DictionaryEntry<K,V> cur = pre.getNext();
+		if (!cur.isSentinel() && key.equals(cur.getKey()) && value.equals(cur.getValue())) {
+			pre.setNext(cur.getNext());
+			size--;
+			removed = true;
 		}
-		finally{
-			pre.unlock();
-			cur.unlock();
-			return removed;
-		}
+		pre.unlock();
+		cur.unlock();
+		return removed;
 	}
 
-	@SuppressWarnings("finally")
 	@Override
-	public boolean replace(K key, V value) {
-		Boolean replaced = false;
-		DictionaryEntry<K,V> pre = null;
-		DictionaryEntry<K,V> cur = null;
-		try{
-			head.lock();
-			head.getNext().lock();
-			pre = head;
-			cur = head.getNext();
-			while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
-				pre.unlock();
-				cur.getNext().lock();
-				pre = cur;
-				cur = cur.getNext();
-			}
-			if (key.equals(cur.getKey())) {
-				cur.setValue(value);
-				replaced = true;
-			}
+	public boolean replace(K key, V value) throws NullValueException {
+		if (value == null)
+			throw new NullValueException("Cannot insert null value entries into the dictionary");
+		boolean replaced = false;
+		DictionaryEntry<K,V> pre = search(key);
+		DictionaryEntry<K,V> cur = pre.getNext();
+		if (!cur.isSentinel() && key.equals(cur.getKey())) {
+			cur.setValue(value);
+			replaced = true;
 		}
-		finally{
-			pre.unlock();
-			cur.unlock();
-			return replaced;
-		}
+		pre.unlock();
+		cur.unlock();
+		return replaced;
 	}
 
-	@SuppressWarnings("finally")
 	@Override
-	public boolean replace(K key, V oldValue, V newValue) {
-		Boolean replaced = false;
-		DictionaryEntry<K,V> pre = null;
-		DictionaryEntry<K,V> cur = null;
-		try{
-			head.lock();
-			head.getNext().lock();
-			pre = head;
-			cur = head.getNext();
-			while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
-				pre.unlock();
-				cur.getNext().lock();
-				pre = cur;
-				cur = cur.getNext();
-			}
-			if (key.equals(cur.getKey()) && oldValue.equals(cur.getValue())) {
-				cur.setValue(newValue);
-				replaced = true;
-			}
+	public boolean replace(K key, V oldValue, V newValue) throws NullValueException {
+		if (newValue == null)
+			throw new NullValueException("Cannot insert null value entries into the dictionary");
+		boolean replaced = false;
+		DictionaryEntry<K,V> pre = search(key);
+		DictionaryEntry<K,V> cur = pre.getNext();
+		if (!cur.isSentinel() && key.equals(cur.getKey()) && oldValue.equals(cur.getValue())) {
+			cur.setValue(newValue);
+			replaced = true;
 		}
-		finally{
-			pre.unlock();
-			cur.unlock();
-			return replaced;
-		}
+		pre.unlock();
+		cur.unlock();
+		return replaced;
 	}
 
-	@SuppressWarnings("finally")
 	@Override
 	public V get(K key) {
 		V value = null;
-		DictionaryEntry<K,V> pre = null;
-		DictionaryEntry<K,V> cur = null;
-		try{
-			head.lock();
-			head.getNext().lock();
-			pre = head;
-			cur = head.getNext();
-			while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
-				pre.unlock();
-				cur.getNext().lock();
-				pre = cur;
-				cur = cur.getNext();
-			}
-			if (!cur.isSentinel() && key.equals(cur.getKey()))
-				value = cur.getValue();
-		}
-		finally{
-			pre.unlock();
-			cur.unlock();
-			return value;
-		}
+		DictionaryEntry<K,V> pre = search(key);
+		DictionaryEntry<K,V> cur = pre.getNext();
+		if (!cur.isSentinel() && key.equals(cur.getKey()))
+			value = cur.getValue();
+		pre.unlock();
+		cur.unlock();
+		return value;
 	}
 
 	@Override
@@ -213,7 +160,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 	@SuppressWarnings("finally")
 	@Override
 	public String toString() {
-		String dicToString = "";
+		String dicToString = "[";
 		DictionaryEntry<K,V> pre = null;
 		DictionaryEntry<K,V> cur = null;
 		try{
@@ -222,7 +169,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 			pre = head;
 			cur = head.getNext();
 			while (!cur.isSentinel()) {
-				dicToString += cur.toString() + "\n";
+				dicToString += cur.toString() + ", ";
 				pre.unlock();
 				cur.getNext().lock();
 				pre = cur;
@@ -232,7 +179,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V> implements MyDi
 		finally{
 			pre.unlock();
 			cur.unlock();
-			return dicToString;
+			return dicToString.substring(0, dicToString.length()-2) + "]";
 		}
 	}
 	
