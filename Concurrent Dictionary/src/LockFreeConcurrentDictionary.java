@@ -1,8 +1,10 @@
 import java.util.concurrent.atomic.AtomicMarkableReference;
 
-public class LockFreeConcurrentDictionary<K extends Comparable<K>,V> implements MyDictionary<K,V> {
+public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
+		implements MyDictionary<K,V> {
 
-	private static final class DictionaryEntry<K extends Comparable<K>,V> extends AtomicMarkableReference<DictionaryEntry<K,V>> {
+	private static final class DictionaryEntry<K extends Comparable<K>,V>
+			extends AtomicMarkableReference<DictionaryEntry<K,V>> {
 		
 		private final K key;
 		private volatile V value;
@@ -31,21 +33,23 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V> implements 
 			this.value = value;
 		}
 		
-		public Boolean isSentinel() {
+		public boolean isSentinel() {
 			return (key == null);
 		}
 		
 		public String toString() {
-			return key.toString() + " : " + value.toString();
+			return key.toString() + ":" + value.toString();
 		}
 		
 	}
 	
-	private volatile int size;
+	private volatile Integer size;
+	private Integer capacity;
 	private DictionaryEntry<K,V> head;
 	
-	public LockFreeConcurrentDictionary() {
+	public LockFreeConcurrentDictionary(int capacity) {
 		size = 0;
+		this.capacity = Integer.valueOf(capacity);
 		DictionaryEntry<K,V> sl = new DictionaryEntry<K,V>();
 		DictionaryEntry<K,V> sr = new DictionaryEntry<K,V>();
 		head = sl;
@@ -53,75 +57,48 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V> implements 
 	}
 
 	@Override
-	public V put(K key, V value) {
-		V putValue = null;
-		Boolean finished = false;
-		boolean[] mark = new boolean[1];
+	public boolean put(K key, V value)
+			throws NullKeyException, NullValueException, FullDictionaryException {
+		if (key == null)
+			throw new NullKeyException(
+					"Cannot insert null key entries into the dictionary");
+		if (value == null)
+			throw new NullValueException(
+					"Cannot insert null value entries into the dictionary");
+		boolean success = false;
+		boolean finished = false;
 		while (!finished) {
-			DictionaryEntry<K,V> pre = head;
-			DictionaryEntry<K,V> cur = head.getReference();
-			DictionaryEntry<K,V> suc;
-			while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
-				suc = cur.get(mark);
-				if (mark[0]) {
-					if (pre.compareAndSet(cur, suc, false, false)) {
-						cur = suc;
-					}
-					else {
-						pre = head;
-						cur = head.getReference();
-					}
-				}
-				else {
-				pre = cur;
-				cur = suc;
-				}
-			}
+			DictionaryEntry<K,V> pre = searchAndClean(key);
+			DictionaryEntry<K,V> cur = pre.getReference();
 			if (cur.isSentinel() || !key.equals(cur.getKey())) {
+				incrementSize();
 				finished = pre.compareAndSet(cur, new DictionaryEntry<K,V>(key, value, cur), false, false);
-				if (finished) {
-					putValue = value;
-					size++;
-				}
+				if (finished)
+					success = true;
+				else
+					size--;
 			}
 			else {
 				finished = true;
 			}
 		}
-		return putValue;
+		return success;
 	}
 
 	@Override
-	public Boolean remove(K key, V value) {
-		Boolean finished = false;
-		Boolean removed = false;
-		boolean[] mark = new boolean[1];
+	public boolean remove(K key, V value) {
+		boolean removed = false;
+		boolean finished = false;
 		while (!finished) {
-			DictionaryEntry<K,V> pre = head;
-			DictionaryEntry<K,V> cur = head.getReference();
-			DictionaryEntry<K,V> suc;
-			while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
-				suc = cur.get(mark);
-				if (mark[0]) {
-					if (pre.compareAndSet(cur, suc, false, false)) {
-						cur = suc;
-					}
-					else {
-						pre = head;
-						cur = head.getReference();
-					}
-				}
-				else {
-				pre = cur;
-				cur = suc;
-				}
-			}
-			if (!cur.isSentinel() && key.equals(cur.getKey()) && value.equals(cur.getValue())) {
-				suc = cur.getReference();
-				if (cur.attemptMark(suc, true)) {
+			DictionaryEntry<K,V> pre = searchAndClean(key);
+			DictionaryEntry<K,V> cur = pre.getReference();
+			if (!cur.isSentinel()
+					&& key.equals(cur.getKey())
+					&& value.equals(cur.getValue())) {
+				if (cur.attemptMark(cur.getReference(), true)) {
+					size--;
 					finished = true;
 					removed = true;
-					size--;
 				}
 			}
 			else {
@@ -132,43 +109,41 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V> implements 
 	}
 
 	@Override
-	public Boolean replace(K key, V value) {
-		DictionaryEntry<K,V> temp = head.getReference();
-		
-		while (!temp.isSentinel() && key.compareTo(temp.getKey()) > 0)
-			temp = temp.getReference();
-
-		if (!temp.isSentinel() && key.equals(temp.getKey()) && !temp.isMarked()) {
-			temp.setValue(value);
+	public boolean replace(K key, V value) {
+		DictionaryEntry<K,V> cur = search(key);
+		if (!cur.isSentinel()
+				&& !cur.isMarked()
+				&& key.equals(cur.getKey())) {
+			cur.setValue(value);
 			return true;
 		}
-		else return false;
+		else
+			return false;
 	}
 
 	@Override
-	public Boolean replace(K key, V oldValue, V newValue) {
-		DictionaryEntry<K,V> temp = head.getReference();
-		
-		while (!temp.isSentinel() && key.compareTo(temp.getKey()) > 0)
-			temp = temp.getReference();
-
-		if (!temp.isSentinel() && key.equals(temp.getKey()) && oldValue.equals(temp.getValue()) && !temp.isMarked()) {
-			temp.setValue(newValue);
+	public boolean replace(K key, V oldValue, V newValue) {
+		DictionaryEntry<K,V> cur = search(key);
+		if (!cur.isSentinel()
+				&& !cur.isMarked()
+				&& key.equals(cur.getKey())
+				&& oldValue.equals(cur.getValue())) {
+			cur.setValue(newValue);
 			return true;
 		}
-		else return false;
+		else
+			return false;
 	}
 
 	@Override
 	public V get(K key) {
-		DictionaryEntry<K,V> temp = head.getReference();
-		
-		while (!temp.isSentinel() && key.compareTo(temp.getKey()) > 0)
-			temp = temp.getReference();
-
-		if (!temp.isSentinel() && key.equals(temp.getKey()) && !temp.isMarked())
-			return temp.getValue();
-		else return null;
+		DictionaryEntry<K,V> cur = search(key);
+		if (!cur.isSentinel()
+				&& !cur.isMarked()
+				&& key.equals(cur.getKey()))
+			return cur.getValue();
+		else
+			return null;
 	}
 
 	@Override
@@ -176,19 +151,69 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V> implements 
 		return size;
 	}
 	
+	public boolean isFull() {
+		return (size >= capacity);
+	}
+	
 	@Override
-	public String toString() {
-		String dicToString = "";
+	public synchronized String toString() {
+		String dicToString = "[";
 		boolean[] mark = new boolean[1];
 		DictionaryEntry<K,V> cur = head.getReference();
 		DictionaryEntry<K,V> suc = cur.get(mark);
 		while (!cur.isSentinel()) {
 			if (!mark[0])
-				dicToString += cur.toString() + "\n";
+				dicToString += cur.toString() + ", ";
 			cur = suc;
 			suc = suc.get(mark);
 		}
-		return dicToString;
+		if (dicToString.length() > 3)
+			return dicToString.substring(0, dicToString.length()-2) + "]";
+		else
+			return "[]";
+	}
+	
+	private DictionaryEntry<K,V> searchAndClean(K key) {
+		DictionaryEntry<K,V> pre = head;
+		DictionaryEntry<K,V> cur = head.getReference();
+		DictionaryEntry<K,V> suc;
+		boolean[] mark = new boolean[1];
+		while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
+			suc = cur.get(mark);
+			if (mark[0]) {
+				if (pre.compareAndSet(cur, suc, false, false)) {
+					cur = suc;
+				}
+				else {
+					pre = head;
+					cur = head.getReference();
+				}
+			}
+			else {
+			pre = cur;
+			cur = suc;
+			}
+		}
+		return pre;
+	}
+	
+	private DictionaryEntry<K,V> search(K key) {
+		DictionaryEntry<K,V> cur = head.getReference();
+		while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
+			cur = cur.getReference();
+		}
+		return cur;
+	}
+	
+	private void incrementSize() throws FullDictionaryException {
+		synchronized (size) {
+			if (this.isFull())
+				throw new FullDictionaryException(
+						"The dictionary is full, "
+						+ "cannot insert any more entries");
+			else
+				size++;
+		}
 	}
 
 }

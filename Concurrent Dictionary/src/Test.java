@@ -1,10 +1,10 @@
 
 public class Test {
 
-	public static void main(String[] args) throws NullKeyException, NullValueException {
-		MyDictionary<String,Integer> myDictionary = new FineConcurrentDictionary<String,Integer>();
-		//MyDictionary<String,Integer> myDictionary = new LazyConcurrentDictionary<String,Integer>();
-		//MyDictionary<String,Integer> myDictionary = new LockFreeConcurrentDictionary<String,Integer>();
+	public static void main(String[] args) throws NullKeyException, NullValueException, FullDictionaryException {
+		//MyDictionary<String,Integer> myDictionary = new FineConcurrentDictionary<String,Integer>(10);
+		//MyDictionary<String,Integer> myDictionary = new LazyConcurrentDictionary<String,Integer>(10);
+		MyDictionary<String,Integer> myDictionary = new LockFreeConcurrentDictionary<String,Integer>(10);
 		System.out.println("PUT");
 		myDictionary.put("a", 1);
 		myDictionary.put("c", 3);
