@@ -1,3 +1,4 @@
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicMarkableReference;
 
 public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
@@ -43,13 +44,13 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 		
 	}
 	
-	private volatile Integer size;
-	private Integer capacity;
-	private DictionaryEntry<K,V> head;
+	private volatile AtomicInteger size;
+	private final int capacity;
+	private final DictionaryEntry<K,V> head;
 	
 	public LockFreeConcurrentDictionary(int capacity) {
-		size = 0;
-		this.capacity = Integer.valueOf(capacity);
+		size = new AtomicInteger(0);
+		this.capacity = capacity;
 		DictionaryEntry<K,V> sl = new DictionaryEntry<K,V>();
 		DictionaryEntry<K,V> sr = new DictionaryEntry<K,V>();
 		head = sl;
@@ -76,7 +77,7 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 				if (finished)
 					success = true;
 				else
-					size--;
+					size.decrementAndGet();
 			}
 			else {
 				finished = true;
@@ -92,11 +93,14 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 		while (!finished) {
 			DictionaryEntry<K,V> pre = searchAndClean(key);
 			DictionaryEntry<K,V> cur = pre.getReference();
-			if (!cur.isSentinel()
+			if (cur != null
+					&& !cur.isSentinel()
 					&& key.equals(cur.getKey())
-					&& value.equals(cur.getValue())) {
-				if (cur.attemptMark(cur.getReference(), true)) {
-					size--;
+					&& value.equals(cur.getValue())
+					&& !cur.isMarked()) {
+				if(cur.compareAndSet(cur.getReference(), cur.getReference(),
+						false, true)) {
+					size.decrementAndGet();
 					finished = true;
 					removed = true;
 				}
@@ -148,11 +152,11 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 
 	@Override
 	public int size() {
-		return size;
+		return size.get();
 	}
 	
 	public boolean isFull() {
-		return (size >= capacity);
+		return (size.get() >= capacity);
 	}
 	
 	@Override
@@ -181,17 +185,17 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 		while (!cur.isSentinel() && key.compareTo(cur.getKey()) > 0) {
 			suc = cur.get(mark);
 			if (mark[0]) {
-				if (pre.compareAndSet(cur, suc, false, false)) {
+				if(pre.compareAndSet(cur, suc, false, false)) {
 					cur = suc;
 				}
 				else {
-					pre = head;
-					cur = head.getReference();
+				pre = head;
+				cur = head.getReference();
 				}
 			}
 			else {
-			pre = cur;
-			cur = suc;
+				pre = cur;
+				cur = suc;
 			}
 		}
 		return pre;
@@ -206,13 +210,11 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 	}
 	
 	private void incrementSize() throws FullDictionaryException {
-		synchronized (size) {
-			if (this.isFull())
-				throw new FullDictionaryException(
-						"The dictionary is full, "
-						+ "cannot insert any more entries");
-			else
-				size++;
+		if (size.incrementAndGet() > capacity) {
+			size.decrementAndGet();
+			throw new FullDictionaryException(
+					"The dictionary is full, "
+					+ "cannot insert any more entries");
 		}
 	}
 

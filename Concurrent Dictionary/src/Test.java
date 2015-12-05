@@ -1,81 +1,75 @@
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CyclicBarrier;
 
 public class Test {
 	
-	public static int THREADS_NUMBER = 5;
 	public static int CAPACITY = 100;
-
+	public static int SIZE = 100;
+	
 	public static void main(String[] args) {
 		
-		MyDictionary<Integer,Integer> testDictionary = new LockFreeConcurrentDictionary<Integer,Integer>(CAPACITY);
+		MyDictionary<Integer,Integer> testDictionary = null;
+		CyclicBarrier barrier = new CyclicBarrier(2);
+		Thread t0, t1;
 		
-		for (int i = 0; i < 10; i++) {
-			try {
-				testDictionary.put(i,i);
-			} catch (NullKeyException | NullValueException | FullDictionaryException e) {
-				e.printStackTrace();
+		for(int k = 0; k < 10; k++) {
+		
+			for (int i = 0; i < 3; i++) {
+				switch (i) {
+					case 0:	System.out.println("FINE GRAINED VERSION TEST");
+							testDictionary = new FineConcurrentDictionary<Integer,Integer>(CAPACITY);
+							break;
+					case 1: System.out.println("LAZY VERSION TEST");
+							testDictionary = new LazyConcurrentDictionary<Integer,Integer>(CAPACITY);
+							break;
+					case 2: System.out.println("LOCK FREE VERSION TEST");
+							testDictionary = new LockFreeConcurrentDictionary<Integer,Integer>(CAPACITY);
+							break;
+				}
+				
+				// PUT
+				
+				t0 = new Thread(new PutTestThread(0,testDictionary,barrier));
+				t1 = new Thread(new PutTestThread(1,testDictionary,barrier));
+				
+				t0.start();
+				t1.start();
+				
+				try {
+					t0.join();
+					t1.join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				assert(testDictionary.size() == SIZE);
+				
+				System.out.println("INITIAL: " + testDictionary.toString());
+				System.out.println("SIZE: " + testDictionary.size());
+				
+				// REMOVE
+				
+				t0 = new Thread(new RemoveTestThread(0,testDictionary,barrier));
+				t1 = new Thread(new RemoveTestThread(1,testDictionary,barrier));
+				
+				t0.start();
+				t1.start();
+				
+				try {
+					t0.join();
+					t1.join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				assert(testDictionary.size() == 0) : testDictionary.size();
+				assert(testDictionary.toString().equals("[]")) : testDictionary.toString();
+				
+				System.out.println("FINAL: " + testDictionary.toString());
+				System.out.println("SIZE: " + testDictionary.size());
 			}
-		}
 		
-		TestThread t0;
-		TestThread t1;
-		
-		for(int i = 0; i < 10; i++) {
-			t0 = new TestThread(testDictionary,19-i);
-			t1 = new TestThread(testDictionary,19-i);
-			t0.start();
-			t1.start();
-			try {
-				t0.join();
-				t1.join();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			System.out.println(testDictionary.toString());
-		}
-		
-		/*
-		
-		List<TestThread> tasks = new ArrayList<TestThread>();
-		for (int i = 0; i < THREADS_NUMBER; i++) {
-			tasks.add(new TestThread(testDictionary));
-		}
-		
-		ExecutorService executor = Executors.newFixedThreadPool(THREADS_NUMBER);
-		
-		try {
-			executor.invokeAll(tasks);
-		}
-		catch (InterruptedException e) {
-			e.printStackTrace();
 		}
 
-		testDictionary = new LazyConcurrentDictionary<String,String>(CAPACITY);
-		
-		try {
-			executor.invokeAll(tasks);
-		}
-		catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		
-		testDictionary = new LockFreeConcurrentDictionary<String,String>(CAPACITY);
-				
-		try {
-			executor.invokeAll(tasks);
-		}
-		catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		
-		*/
-		
-		System.out.println("FINAL: " + testDictionary.toString());
-		System.out.println("SIZE: " + testDictionary.size());
-				
 	}
 	
 }
