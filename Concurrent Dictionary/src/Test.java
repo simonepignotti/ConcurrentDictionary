@@ -1,38 +1,81 @@
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Test {
+	
+	public static int THREADS_NUMBER = 5;
+	public static int CAPACITY = 100;
 
-	public static void main(String[] args) throws NullKeyException, NullValueException, FullDictionaryException {
-		//MyDictionary<String,Integer> myDictionary = new FineConcurrentDictionary<String,Integer>(10);
-		//MyDictionary<String,Integer> myDictionary = new LazyConcurrentDictionary<String,Integer>(10);
-		MyDictionary<String,Integer> myDictionary = new LockFreeConcurrentDictionary<String,Integer>(10);
-		System.out.println("PUT");
-		myDictionary.put("a", 1);
-		myDictionary.put("c", 3);
-		myDictionary.put("b", 2);
-		myDictionary.put("b", 20);
-		System.out.println(myDictionary.toString());
-		System.out.println("SIZE: " + myDictionary.size());
-		System.out.println("GET");
-		System.out.println(myDictionary.get("b"));
-		System.out.println(myDictionary.get("c"));
-		System.out.println(myDictionary.get("a"));
-		System.out.println(myDictionary.get("d"));
-		System.out.println("SIZE: " + myDictionary.size());
-		System.out.println("REMOVE");
-		System.out.println(myDictionary.remove("b", 2));
-		System.out.println(myDictionary.remove("c", 30));
-		System.out.println(myDictionary.toString());
-		System.out.println("SIZE: " + myDictionary.size());
-		System.out.println("REPLACE");
-		myDictionary.put("d", 4);
-		myDictionary.put("e", 5);
-		myDictionary.put("b", 2);
-		myDictionary.put("f", 20);
-		System.out.println(myDictionary.replace("f", 6));
-		System.out.println(myDictionary.replace("f", 20, 6));
-		System.out.println(myDictionary.replace("g", 7));
-		System.out.println(myDictionary.replace("a", 1, 100));
-		System.out.println(myDictionary.toString());
+	public static void main(String[] args) {
+		
+		MyDictionary<Integer,Integer> testDictionary = new LockFreeConcurrentDictionary<Integer,Integer>(CAPACITY);
+		
+		for (int i = 0; i < 10; i++) {
+			try {
+				testDictionary.put(i,i);
+			} catch (NullKeyException | NullValueException | FullDictionaryException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		TestThread t0;
+		TestThread t1;
+		
+		for(int i = 0; i < 10; i++) {
+			t0 = new TestThread(testDictionary,19-i);
+			t1 = new TestThread(testDictionary,19-i);
+			t0.start();
+			t1.start();
+			try {
+				t0.join();
+				t1.join();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+			System.out.println(testDictionary.toString());
+		}
+		
+		/*
+		
+		List<TestThread> tasks = new ArrayList<TestThread>();
+		for (int i = 0; i < THREADS_NUMBER; i++) {
+			tasks.add(new TestThread(testDictionary));
+		}
+		
+		ExecutorService executor = Executors.newFixedThreadPool(THREADS_NUMBER);
+		
+		try {
+			executor.invokeAll(tasks);
+		}
+		catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
+		testDictionary = new LazyConcurrentDictionary<String,String>(CAPACITY);
+		
+		try {
+			executor.invokeAll(tasks);
+		}
+		catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		
+		testDictionary = new LockFreeConcurrentDictionary<String,String>(CAPACITY);
+				
+		try {
+			executor.invokeAll(tasks);
+		}
+		catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		
+		*/
+		
+		System.out.println("FINAL: " + testDictionary.toString());
+		System.out.println("SIZE: " + testDictionary.size());
+				
 	}
 	
 }
