@@ -72,8 +72,14 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 			DictionaryEntry<K,V> pre = searchAndClean(key);
 			DictionaryEntry<K,V> cur = pre.getReference();
 			if (cur.isSentinel() || !key.equals(cur.getKey())) {
+				/*
+				 * increment the size before the cas to "reserve" a place for
+				 * the new entry, and decrement it in case of failure
+				 */
 				incrementSize();
-				finished = pre.compareAndSet(cur, new DictionaryEntry<K,V>(key, value, cur), false, false);
+				finished = pre.compareAndSet(cur,
+						new DictionaryEntry<K,V>(key, value, cur),
+						false, false);
 				if (finished)
 					success = true;
 				else
@@ -153,10 +159,6 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 	@Override
 	public int size() {
 		return size.get();
-	}
-	
-	public boolean isFull() {
-		return (size.get() >= capacity);
 	}
 	
 	@Override

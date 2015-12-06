@@ -4,7 +4,7 @@ import java.util.concurrent.CyclicBarrier;
 
 public class Test {
 	
-	public static int THREAD_NUM = 100;
+	public static int THREAD_NUM = 50;
 	public static int CAPACITY = 10000;
 	public static int SIZE = 10000;
 	
@@ -49,7 +49,11 @@ public class Test {
 				}
 			}
 			
-			assert(testDictionary.size() == SIZE) : testDictionary.size();
+			try {
+				assert(testDictionary.size() == SIZE) : testDictionary.size();
+			} catch (AssertionError e) {
+				e.printStackTrace();
+			}
 			
 			// FUNCTIONALITY REMOVE
 			
@@ -71,7 +75,11 @@ public class Test {
 				}
 			}
 			
-			assert(testDictionary.size() == 0) : testDictionary.size();
+			try {
+				assert(testDictionary.size() == 0) : (testDictionary.toString());
+			} catch (AssertionError e) {
+				e.printStackTrace();
+			}
 			
 			// PUT
 			

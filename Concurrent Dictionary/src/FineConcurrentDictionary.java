@@ -1,3 +1,4 @@
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class FineConcurrentDictionary<K extends Comparable<K>,V>
@@ -63,12 +64,12 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V>
 		
 	}
 	
-	private volatile Integer size;
+	private volatile AtomicInteger size;
 	private Integer capacity;
 	private DictionaryEntry<K,V> head;
 	
 	public FineConcurrentDictionary(int capacity) {
-		size = 0;
+		size = new AtomicInteger(0);
 		this.capacity = Integer.valueOf(capacity);
 		DictionaryEntry<K,V> sl = new DictionaryEntry<K,V>();
 		DictionaryEntry<K,V> sr = new DictionaryEntry<K,V>();
@@ -117,7 +118,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V>
 			if (!cur.isSentinel()
 					&& key.equals(cur.getKey())
 					&& value.equals(cur.getValue())) {
-				size--;
+				size.decrementAndGet();
 				pre.setNext(cur.getNext());
 				removed = true;
 			}
@@ -198,11 +199,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V>
 
 	@Override
 	public int size() {
-		return size;
-	}
-	
-	public boolean isFull() {
-		return size >= capacity;
+		return size.get();
 	}
 	
 	@Override
@@ -234,13 +231,11 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V>
 	}
 	
 	private void incrementSize() throws FullDictionaryException {
-		synchronized (size) {
-			if (this.isFull())
-				throw new FullDictionaryException(
-						"The dictionary is full, "
-						+ "cannot insert any more entries");
-			else
-				size++;
+		if (size.incrementAndGet() > capacity) {
+			size.decrementAndGet();
+			throw new FullDictionaryException(
+					"The dictionary is full, "
+					+ "cannot insert any more entries");
 		}
 	}
 	

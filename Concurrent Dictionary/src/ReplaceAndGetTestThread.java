@@ -4,7 +4,8 @@ public class ReplaceAndGetTestThread implements Runnable {
 	private int beginIndex;
 	private MyDictionary<Integer,Integer> testDictionary;
 	
-	public ReplaceAndGetTestThread(int beginIndex, MyDictionary<Integer,Integer> testDictionary) {
+	public ReplaceAndGetTestThread(int beginIndex,
+			MyDictionary<Integer,Integer> testDictionary) {
 		this.beginIndex = beginIndex;
 		this.testDictionary = testDictionary;
 	}
