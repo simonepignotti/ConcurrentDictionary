@@ -1,75 +1,149 @@
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.CyclicBarrier;
 
 public class Test {
 	
-	public static int CAPACITY = 100;
-	public static int SIZE = 100;
+	public static int THREAD_NUM = 100;
+	public static int CAPACITY = 10000;
+	public static int SIZE = 10000;
 	
 	public static void main(String[] args) {
 		
 		MyDictionary<Integer,Integer> testDictionary = null;
-		CyclicBarrier barrier = new CyclicBarrier(2);
-		Thread t0, t1;
+		CyclicBarrier barrier = new CyclicBarrier(THREAD_NUM);
+		List<Thread> threads;
+		long completionTime;
 		
-		for(int k = 0; k < 10; k++) {
-		
-			for (int i = 0; i < 3; i++) {
-				switch (i) {
-					case 0:	System.out.println("FINE GRAINED VERSION TEST");
-							testDictionary = new FineConcurrentDictionary<Integer,Integer>(CAPACITY);
-							break;
-					case 1: System.out.println("LAZY VERSION TEST");
-							testDictionary = new LazyConcurrentDictionary<Integer,Integer>(CAPACITY);
-							break;
-					case 2: System.out.println("LOCK FREE VERSION TEST");
-							testDictionary = new LockFreeConcurrentDictionary<Integer,Integer>(CAPACITY);
-							break;
-				}
-				
-				// PUT
-				
-				t0 = new Thread(new PutTestThread(0,testDictionary,barrier));
-				t1 = new Thread(new PutTestThread(1,testDictionary,barrier));
-				
-				t0.start();
-				t1.start();
-				
-				try {
-					t0.join();
-					t1.join();
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-				
-				assert(testDictionary.size() == SIZE);
-				
-				System.out.println("INITIAL: " + testDictionary.toString());
-				System.out.println("SIZE: " + testDictionary.size());
-				
-				// REMOVE
-				
-				t0 = new Thread(new RemoveTestThread(0,testDictionary,barrier));
-				t1 = new Thread(new RemoveTestThread(1,testDictionary,barrier));
-				
-				t0.start();
-				t1.start();
-				
-				try {
-					t0.join();
-					t1.join();
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-				
-				assert(testDictionary.size() == 0) : testDictionary.size();
-				assert(testDictionary.toString().equals("[]")) : testDictionary.toString();
-				
-				System.out.println("FINAL: " + testDictionary.toString());
-				System.out.println("SIZE: " + testDictionary.size());
+		for (int i = 0; i < 3; i++) {
+			
+			switch (i) {
+				case 0:	System.out.println("FINE GRAINED VERSION TEST\n");
+						testDictionary = new FineConcurrentDictionary<Integer,Integer>(CAPACITY);
+						break;
+				case 1: System.out.println("\nLAZY VERSION TEST\n");
+						testDictionary = new LazyConcurrentDictionary<Integer,Integer>(CAPACITY);
+						break;
+				case 2: System.out.println("\nLOCK FREE VERSION TEST\n");
+						testDictionary = new LockFreeConcurrentDictionary<Integer,Integer>(CAPACITY);
+						break;
 			}
-		
-		}
+			
+			// FUNCTIONALITY PUT
+			
+			System.out.println("Functionality Put (successfull if no exception is raised)");
+			
+			threads = new LinkedList<Thread>();
+			
+			for (int j = 0; j < THREAD_NUM; j++)
+				threads.add(new PutTestThread(j, true, testDictionary, barrier));
+			
+			for (Thread t : threads)
+				t.start();
+			
+			for (Thread t : threads) {
+				try {
+					t.join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			
+			assert(testDictionary.size() == SIZE) : testDictionary.size();
+			
+			// FUNCTIONALITY REMOVE
+			
+			System.out.println("Functionality Remove (successfull if no exception is raised)");
+			
+			threads = new LinkedList<Thread>();
+			
+			for (int j = 0; j < THREAD_NUM; j++)
+				threads.add(new RemoveTestThread(j, true, testDictionary, barrier));
+			
+			for (Thread t : threads)
+				t.start();
+			
+			for (Thread t : threads) {
+				try {
+					t.join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			
+			assert(testDictionary.size() == 0) : testDictionary.size();
+			
+			// PUT
+			
+			threads = new LinkedList<Thread>();
 
+			completionTime = System.currentTimeMillis();
+			
+			for (int j = 0; j < THREAD_NUM; j++)
+				threads.add(new PutTestThread(j, false, testDictionary, barrier));
+			
+			for (Thread t : threads)
+				t.start();
+			
+			for (Thread t : threads) {
+				try {
+					t.join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			
+			completionTime = System.currentTimeMillis() - completionTime;
+			System.out.println("Put completion time: " + completionTime);
+			
+			// REPLACE & GET
+			
+			threads = new LinkedList<Thread>();
+
+			completionTime = System.currentTimeMillis();
+			
+			for (int j = 0; j < THREAD_NUM; j++)
+				threads.add(new PutTestThread(j, false, testDictionary, barrier));
+			
+			for (Thread t : threads)
+				t.start();
+			
+			for (Thread t : threads) {
+				try {
+					t.join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			
+			completionTime = System.currentTimeMillis() - completionTime;
+			System.out.println("Replace + get completion time: " + completionTime);
+			
+			// REMOVE
+			
+			threads = new LinkedList<Thread>();
+
+			completionTime = System.currentTimeMillis();
+			
+			for (int j = 0; j < THREAD_NUM; j++)
+				threads.add(new PutTestThread(j, false, testDictionary, barrier));
+			
+			for (Thread t : threads)
+				t.start();
+			
+			for (Thread t : threads) {
+				try {
+					t.join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			
+			completionTime = System.currentTimeMillis() - completionTime;
+			System.out.println("Remove completion time: " + completionTime);
+			
+		}
+	
 	}
 	
 }
