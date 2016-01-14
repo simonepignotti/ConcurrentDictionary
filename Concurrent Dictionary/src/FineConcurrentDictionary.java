@@ -96,6 +96,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V>
 				incrementSize();
 				DictionaryEntry<K,V> newEntry =
 						new DictionaryEntry<K,V>(key,value,cur);
+				// linearization point
 				pre.setNext(newEntry);
 				success = true;
 			}
@@ -119,6 +120,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V>
 					&& key.equals(cur.getKey())
 					&& value.equals(cur.getValue())) {
 				size.decrementAndGet();
+				// linearization point
 				pre.setNext(cur.getNext());
 				removed = true;
 			}
@@ -142,6 +144,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V>
 			pre = search(key);
 			cur = pre.getNext();
 			if (!cur.isSentinel() && key.equals(cur.getKey())) {
+				// linearization point
 				cur.setValue(value);
 				replaced = true;
 			}
@@ -168,6 +171,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V>
 			if (!cur.isSentinel()
 					&& key.equals(cur.getKey())
 					&& oldValue.equals(cur.getValue())) {
+				// linearization point
 				cur.setValue(newValue);
 				replaced = true;
 			}
@@ -188,6 +192,7 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V>
 			pre = search(key);
 			cur = pre.getNext();
 			if (!cur.isSentinel() && key.equals(cur.getKey()))
+				// linearization point
 				value = cur.getValue();
 		}
 		finally {
@@ -231,7 +236,9 @@ public class FineConcurrentDictionary<K extends Comparable<K>,V>
 	}
 	
 	private void incrementSize() throws FullDictionaryException {
+		// linearization point (successful)
 		if (size.incrementAndGet() > capacity) {
+			// linearization point (unsuccessful)
 			size.decrementAndGet();
 			throw new FullDictionaryException(
 					"The dictionary is full, "

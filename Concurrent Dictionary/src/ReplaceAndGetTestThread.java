@@ -1,10 +1,11 @@
 
-public class ReplaceAndGetTestThread implements Runnable {
+public class ReplaceAndGetTestThread extends Thread {
 	
 	private int beginIndex;
 	private MyDictionary<Integer,Integer> testDictionary;
 	
-	public ReplaceAndGetTestThread(int beginIndex,
+	public ReplaceAndGetTestThread(
+			int beginIndex,
 			MyDictionary<Integer,Integer> testDictionary) {
 		this.beginIndex = beginIndex;
 		this.testDictionary = testDictionary;

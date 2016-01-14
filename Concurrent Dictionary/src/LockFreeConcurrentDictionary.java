@@ -77,12 +77,14 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 				 * the new entry, and decrement it in case of failure
 				 */
 				incrementSize();
+				// linearization point (successful)
 				finished = pre.compareAndSet(cur,
 						new DictionaryEntry<K,V>(key, value, cur),
 						false, false);
 				if (finished)
 					success = true;
 				else
+					// linearization point (unsuccessful)
 					size.decrementAndGet();
 			}
 			else {
@@ -104,6 +106,7 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 					&& key.equals(cur.getKey())
 					&& value.equals(cur.getValue())
 					&& !cur.isMarked()) {
+				// linearization point (successful)
 				if(cur.compareAndSet(cur.getReference(), cur.getReference(),
 						false, true)) {
 					size.decrementAndGet();
@@ -112,6 +115,7 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 				}
 			}
 			else {
+				// linearization point (unsuccessful)
 				finished = true;
 			}
 		}
@@ -124,10 +128,12 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 		if (!cur.isSentinel()
 				&& !cur.isMarked()
 				&& key.equals(cur.getKey())) {
+			// linearization point (successful)
 			cur.setValue(value);
 			return true;
 		}
 		else
+			// linearization point (unsuccessful)
 			return false;
 	}
 
@@ -138,10 +144,12 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 				&& !cur.isMarked()
 				&& key.equals(cur.getKey())
 				&& oldValue.equals(cur.getValue())) {
+			// linearization point (successful)
 			cur.setValue(newValue);
 			return true;
 		}
 		else
+			// linearization point (unsuccessful)
 			return false;
 	}
 
@@ -151,8 +159,10 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 		if (!cur.isSentinel()
 				&& !cur.isMarked()
 				&& key.equals(cur.getKey()))
+			// linearization point (successful)
 			return cur.getValue();
 		else
+			// linearization point (unsuccessful)
 			return null;
 	}
 
@@ -197,9 +207,11 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 			}
 			else {
 				pre = cur;
+				// interleaving?
 				cur = suc;
 			}
 		}
+		// linearization point
 		return pre;
 	}
 	
@@ -212,7 +224,9 @@ public class LockFreeConcurrentDictionary<K extends Comparable<K>,V>
 	}
 	
 	private void incrementSize() throws FullDictionaryException {
+		// linearization point (successful)
 		if (size.incrementAndGet() > capacity) {
+			// linearization point (unsuccessful)
 			size.decrementAndGet();
 			throw new FullDictionaryException(
 					"The dictionary is full, "

@@ -111,7 +111,7 @@ public class Test {
 			completionTime = System.currentTimeMillis();
 			
 			for (int j = 0; j < THREAD_NUM; j++)
-				threads.add(new PutTestThread(j, false, testDictionary, barrier));
+				threads.add(new ReplaceAndGetTestThread(j, testDictionary));
 			
 			for (Thread t : threads)
 				t.start();
@@ -134,7 +134,7 @@ public class Test {
 			completionTime = System.currentTimeMillis();
 			
 			for (int j = 0; j < THREAD_NUM; j++)
-				threads.add(new PutTestThread(j, false, testDictionary, barrier));
+				threads.add(new RemoveTestThread(j, false, testDictionary, barrier));
 			
 			for (Thread t : threads)
 				t.start();

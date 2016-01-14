@@ -113,6 +113,7 @@ public class LazyConcurrentDictionary<K extends Comparable<K>,V>
 						incrementSize();
 						DictionaryEntry<K,V> newEntry =
 								new DictionaryEntry<K,V>(key,value,cur);
+						// linearization point
 						pre.setNext(newEntry);
 						success = true;
 					}
@@ -144,6 +145,7 @@ public class LazyConcurrentDictionary<K extends Comparable<K>,V>
 							&& key.equals(cur.getKey())
 							&& value.equals(cur.getValue())) {
 						size.decrementAndGet();
+						// linearization point
 						cur.mark();
 						pre.setNext(cur.getNext());
 						removed = true;
@@ -164,6 +166,7 @@ public class LazyConcurrentDictionary<K extends Comparable<K>,V>
 		if (!cur.isSentinel()
 				&& !cur.isMarked()
 				&& key.equals(cur.getKey())) {
+			// linearization point
 			cur.setValue(value);
 			return true;
 		}
@@ -178,6 +181,7 @@ public class LazyConcurrentDictionary<K extends Comparable<K>,V>
 				&& !cur.isMarked()
 				&& key.equals(cur.getKey())
 				&& oldValue.equals(cur.getValue())) {
+			// linearization point
 			cur.setValue(newValue);
 			return true;
 		}
